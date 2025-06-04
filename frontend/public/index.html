@@ -1,11 +1,128 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="bg-white text-gray-900">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Appointment Booking</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BookCare - Modern Medical Appointment Booking</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   </head>
-  <body>
-    <div id="root"></div>
+  <body class="font-sans leading-relaxed antialiased">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white">
+      <div class="max-w-7xl mx-auto px-4 py-6 flex items-center justify-between">
+        <h1 class="text-2xl font-bold">BookCare</h1>
+        <nav class="space-x-4 text-sm">
+          <a href="#" class="hover:underline">Home</a>
+          <a href="#" class="hover:underline">Book</a>
+          <a href="#" class="hover:underline">History</a>
+          <a href="#" class="hover:underline">Login</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="bg-blue-50 py-16 px-4">
+      <div class="max-w-4xl mx-auto text-center">
+        <h2 class="text-4xl font-bold mb-4">Your Health, Your Schedule</h2>
+        <p class="text-lg text-gray-700 mb-6">
+          BookCare helps you schedule, manage, and review your medical appointments effortlessly. Secure, simple, and fast.
+        </p>
+        <a href="#" class="bg-blue-600 text-white px-6 py-3 rounded shadow hover:bg-blue-700 transition">
+          Book Appointment
+        </a>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="py-16 bg-white px-4">
+      <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-12 text-center">
+        <div>
+          <h3 class="text-xl font-semibold mb-2">Easy Scheduling</h3>
+          <p class="text-gray-600">Pick a date, choose a doctor, and confirm. Booking an appointment has never been easier.</p>
+        </div>
+        <div>
+          <h3 class="text-xl font-semibold mb-2">Appointment History</h3>
+          <p class="text-gray-600">View your past visits, notes, and prescriptions. Keep your health records in one place.</p>
+        </div>
+        <div>
+          <h3 class="text-xl font-semibold mb-2">Secure Access</h3>
+          <p class="text-gray-600">Your data is protected and encrypted. Log in securely from any device, anytime.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="py-20 bg-gray-100 px-4">
+      <div class="max-w-4xl mx-auto text-center">
+        <h2 class="text-3xl font-bold mb-10">How It Works</h2>
+        <div class="grid md:grid-cols-3 gap-8 text-left">
+          <div>
+            <h4 class="font-semibold text-lg mb-2">1. Sign Up</h4>
+            <p class="text-gray-700">Create your free account using your email address. It only takes a minute.</p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-lg mb-2">2. Book an Appointment</h4>
+            <p class="text-gray-700">Choose the doctor, clinic, and available time slot that works for you.</p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-lg mb-2">3. Get Reminders</h4>
+            <p class="text-gray-700">We’ll notify you via email or SMS so you never miss an appointment.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="py-20 bg-white px-4">
+      <div class="max-w-6xl mx-auto text-center">
+        <h2 class="text-3xl font-bold mb-8">What Patients Say</h2>
+        <div class="grid md:grid-cols-3 gap-6">
+          <div class="bg-gray-50 p-6 rounded shadow">
+            <p class="text-gray-600 italic">"So convenient! I booked a visit in under 2 minutes. Highly recommended."</p>
+            <p class="mt-4 font-semibold">— Sarah L.</p>
+          </div>
+          <div class="bg-gray-50 p-6 rounded shadow">
+            <p class="text-gray-600 italic">"No more phone calls or waiting lines. Everything is online and smooth."</p>
+            <p class="mt-4 font-semibold">— Raj P.</p>
+          </div>
+          <div class="bg-gray-50 p-6 rounded shadow">
+            <p class="text-gray-600 italic">"I can even see my past prescriptions. This app is a game changer."</p>
+            <p class="mt-4 font-semibold">— Lisa M.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="bg-blue-600 text-white py-16 text-center px-4">
+      <h2 class="text-3xl font-bold mb-4">Ready to take control of your health?</h2>
+      <p class="mb-6">Sign up today and start booking your appointments with ease.</p>
+      <a href="#" class="bg-white text-blue-600 px-6 py-3 rounded shadow hover:bg-gray-100 transition">
+        Get Started
+      </a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-300 py-10 px-4">
+      <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+        <div>
+          <h4 class="text-white font-semibold mb-2">BookCare</h4>
+          <p>© 2025 All rights reserved.</p>
+        </div>
+        <div>
+          <h4 class="text-white font-semibold mb-2">Links</h4>
+          <ul class="space-y-1">
+            <li><a href="#" class="hover:underline">Privacy Policy</a></li>
+            <li><a href="#" class="hover:underline">Terms of Service</a></li>
+            <li><a href="#" class="hover:underline">Support</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-semibold mb-2">Contact</h4>
+          <p>Email: support@bookcare.com</p>
+          <p>Phone: +1 234 567 8901</p>
+        </div>
+      </div>
+    </footer>
   </body>
 </html>
