@@ -1,88 +1,102 @@
 const express = require('express');
+const router = express.Router();
+const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const Availability = require('../models/Availability');
+const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
-const roleMiddleware = require('../middleware/role');
-const NotificationService = require('../services/notification');
-const router = express.Router();
+const sendNotification = require('../services/notification');
+const Doctor = require('../models/User'); // Assuming doctors are users with role 'doctor'
 
-router.use(authMiddleware);
+// @route   POST /api/appointments
+// @desc    Book an appointment
+// @access  Private
+router.post('/', authMiddleware, async (req, res) => {
+  const { doctorId, date, time } = req.body;
+  const userId = req.user.id;
 
-router.post('/', roleMiddleware(['patient']), async (req, res) => {
-  const { doctorId, slot, reason } = req.body;
-  const slotDate = new Date(slot);
-
-  // Check availability
-  const available = await Availability.findOne({
-    doctorId,
-    start: { $lte: slotDate },
-    end: { $gt: slotDate }
-  });
-  if (!available) return res.status(400).json({ message: 'Doctor not available at that time' });
-
-  const conflict = await Appointment.findOne({ doctorId, slot: slotDate });
-  if (conflict) return res.status(400).json({ message: 'Time slot already booked' });
-
-  const appointment = new Appointment({
-    patientId: req.user.id,
-    doctorId,
-    slot: slotDate,
-    reason
-  });
-  await appointment.save();
-
-  NotificationService.scheduleReminder(appointment);
-
-  res.json({ message: 'Appointment booked', appointment });
-});
-
-router.put('/:id', roleMiddleware(['patient']), async (req, res) => {
-  const { id } = req.params;
-  const { newSlot } = req.body;
-
-  const appointment = await Appointment.findById(id);
-  if (!appointment || appointment.patientId.toString() !== req.user.id) {
-    return res.status(404).json({ message: 'Appointment not found' });
+  if (!doctorId || !date || !time) {
+    return res.status(400).json({ success: false, message: 'Missing required fields.' });
   }
 
-  const newDate = new Date(newSlot);
+  try {
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-  const available = await Availability.findOne({
-    doctorId: appointment.doctorId,
-    start: { $lte: newDate },
-    end: { $gt: newDate }
-  });
-  if (!available) return res.status(400).json({ message: 'Doctor not available at new time' });
+    // Validate doctor
+    const doctor = await Doctor.findById(doctorId).session(session);
+    if (!doctor || doctor.role !== 'doctor') {
+      await session.abortTransaction();
+      return res.status(404).json({ success: false, message: 'Doctor not found.' });
+    }
 
-  const conflict = await Appointment.findOne({ doctorId: appointment.doctorId, slot: newDate });
-  if (conflict) return res.status(400).json({ message: 'Time slot already booked' });
+    // Check availability
+    const availability = await Availability.findOne({
+      doctorId,
+      date,
+      times: time,
+    }).session(session);
 
-  appointment.slot = newDate;
-  await appointment.save();
+    if (!availability) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: 'Selected time is not available.' });
+    }
 
-  res.json({ message: 'Appointment updated' });
+    // Prevent double-booking
+    const conflict = await Appointment.findOne({
+      doctorId,
+      date,
+      time,
+    }).session(session);
+
+    if (conflict) {
+      await session.abortTransaction();
+      return res.status(409).json({ success: false, message: 'This time slot is already booked.' });
+    }
+
+    // Book the appointment
+    const newAppointment = new Appointment({
+      patientId: userId,
+      doctorId,
+      date,
+      time,
+    });
+
+    await newAppointment.save({ session });
+
+    // Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    // Notify patient via email
+    const patient = await User.findById(userId);
+    await sendNotification(patient.email, {
+      doctorName: doctor.name,
+      date,
+      time,
+    });
+
+    return res.status(201).json({ success: true, message: 'Appointment booked successfully.' });
+  } catch (error) {
+    console.error('Appointment booking error:', error);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
 });
 
-router.get('/', async (req, res) => {
-  const { role, id } = req.user;
-  const { from, to, status } = req.query;
-  const filter = {};
+// @route   GET /api/appointments
+// @desc    Get all appointments for logged-in user
+// @access  Private
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const appointments = await Appointment.find({ patientId: req.user.id })
+      .populate('doctorId', 'name specialization email')
+      .sort({ date: 1, time: 1 });
 
-  if (role === 'patient') filter.patientId = id;
-  if (role === 'doctor') filter.doctorId = id;
-
-  if (from || to) {
-    filter.slot = {};
-    if (from) filter.slot.$gte = new Date(from);
-    if (to) filter.slot.$lte = new Date(to);
+    return res.json({ success: true, data: appointments });
+  } catch (error) {
+    console.error('Fetching appointments failed:', error);
+    return res.status(500).json({ success: false, message: 'Unable to fetch appointments.' });
   }
-
-  if (status) filter.status = status;
-
-  const appointments = await Appointment.find(filter)
-    .populate('doctorId', 'name')
-    .populate('patientId', 'name');
-  res.json(appointments);
 });
 
 module.exports = router;
