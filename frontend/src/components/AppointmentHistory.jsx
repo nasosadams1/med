@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_URL } from '../api';
 
 export default function AppointmentHistory() {
   const [appointments, setAppointments] = useState([]);
@@ -11,7 +12,7 @@ export default function AppointmentHistory() {
       setError(null);
 
       try {
-        const res = await fetch('/api/appointments');
+        const res = await fetch(`${API_URL}/api/appointments`);
         if (!res.ok) throw new Error('Failed to fetch appointments');
 
         const data = await res.json();
