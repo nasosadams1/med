@@ -1,136 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import BookAppointment from './components/BookAppointment';
-import AppointmentHistory from './components/AppointmentHistory';
+import React, { Suspense, lazy, useState } from 'react';
 
-const api = axios.create({ baseURL: 'http://localhost:5000/api' });
+const AppointmentHistory = lazy(() => import('./components/AppointmentHistory'));
+const BookAppointment = lazy(() => import('./components/BookAppointment'));
 
-// Axios interceptor to attach token automatically
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-function App() {
-  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
-  const [user, setUser] = useState(() => {
-    const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
-  });
-  const [loading, setLoading] = useState(false);
-  const [loginError, setLoginError] = useState('');
-
-  // Sync token and user to localStorage when changed
-  useEffect(() => {
-    if (token) localStorage.setItem('token', token);
-    else localStorage.removeItem('token');
-  }, [token]);
-
-  useEffect(() => {
-    if (user) localStorage.setItem('user', JSON.stringify(user));
-    else localStorage.removeItem('user');
-  }, [user]);
-
-  const login = async (email, password) => {
-    setLoading(true);
-    setLoginError('');
-    try {
-      const res = await api.post('/auth/login', { email, password });
-      setToken(res.data.token);
-      setUser(res.data.user);
-    } catch (err) {
-      setLoginError(err.response?.data?.message || 'Invalid credentials');
-      setToken('');
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = () => {
-    setToken('');
-    setUser(null);
-  };
-
-  if (!token) {
-    return <LoginForm onLogin={login} loading={loading} error={loginError} />;
-  }
+export default function App() {
+  // simple tab state to switch between book and history
+  const [view, setView] = useState('book');
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <header className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Medical Appointment System</h1>
-        <button
-          onClick={logout}
-          className="text-blue-600 hover:underline focus:outline-none"
-          aria-label="Logout"
-        >
-          Logout
-        </button>
+    <div className="min-h-screen bg-gray-50 p-4">
+      <header className="mb-4">
+        <nav className="flex gap-4">
+          <button
+            className={`px-4 py-2 rounded ${
+              view === 'book' ? 'bg-blue-600 text-white' : 'bg-white border'
+            }`}
+            onClick={() => setView('book')}
+          >
+            Book Appointment
+          </button>
+          <button
+            className={`px-4 py-2 rounded ${
+              view === 'history' ? 'bg-blue-600 text-white' : 'bg-white border'
+            }`}
+            onClick={() => setView('history')}
+          >
+            Appointment History
+          </button>
+        </nav>
       </header>
-      <main className="space-y-8">
-        <BookAppointment api={api} />
-        <AppointmentHistory api={api} />
+
+      <main>
+        <Suspense fallback={<div>Loading...</div>}>
+          {view === 'book' ? <BookAppointment /> : <AppointmentHistory />}
+        </Suspense>
       </main>
     </div>
   );
 }
-
-function LoginForm({ onLogin, loading, error }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (loading) return;
-    await onLogin(email.trim(), password);
-  };
-
-  return (
-    <form
-      onSubmit={submit}
-      className="max-w-md mx-auto mt-20 p-8 border rounded shadow-sm bg-white"
-      noValidate
-    >
-      <h2 className="text-2xl font-semibold mb-6 text-center">Login</h2>
-      {error && (
-        <div
-          role="alert"
-          className="mb-4 px-4 py-2 text-red-700 bg-red-100 border border-red-400 rounded"
-        >
-          {error}
-        </div>
-      )}
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-        autoComplete="email"
-        disabled={loading}
-        className="mb-4 px-3 py-2 border rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-        autoComplete="current-password"
-        disabled={loading}
-        className="mb-6 px-3 py-2 border rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition disabled:opacity-50"
-      >
-        {loading ? 'Logging in...' : 'Login'}
-      </button>
-    </form>
-  );
-}
-
-export default App;
