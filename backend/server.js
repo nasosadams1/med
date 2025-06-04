@@ -27,4 +27,4 @@ mongoose.connect(MONGO_URI, {
     notificationService.startScheduler();
   });
 }).catch(console.error);
-const PORT = process.env.PORT || 5000;
+
