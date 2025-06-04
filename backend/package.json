@@ -12,7 +12,6 @@
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.0.4",
     "nodemailer": "^6.9.1",
-    "twilio": "^4.15.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
