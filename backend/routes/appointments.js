@@ -1,101 +1,147 @@
 const express = require('express');
-const router = express.Router();
-const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const Availability = require('../models/Availability');
-const User = require('../models/User');
-const authMiddleware = require('../middleware/auth');
-const sendNotification = require('../services/notification');
-const Doctor = require('../models/User'); // Assuming doctors are users with role 'doctor'
+const auth = require('../middleware/auth');
+const role = require('../middleware/role');
+const notificationService = require('../services/notification');
 
-// @route   POST /api/appointments
-// @desc    Book an appointment
-// @access  Private
-router.post('/', authMiddleware, async (req, res) => {
-  const { doctorId, date, time } = req.body;
-  const userId = req.user.id;
+const router = express.Router();
 
-  if (!doctorId || !date || !time) {
-    return res.status(400).json({ success: false, message: 'Missing required fields.' });
-  }
+// Create appointment - UC1
+router.post('/', auth, role(['patient']), async (req, res) => {
+  const { doctorId, date, time, reason } = req.body;
 
+  // Validations
   try {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const selectedDate = new Date(date);
+    if (selectedDate < new Date()) return res.status(400).json({ message: 'Date must be in the future' });
 
-    // Validate doctor
-    const doctor = await Doctor.findById(doctorId).session(session);
-    if (!doctor || doctor.role !== 'doctor') {
-      await session.abortTransaction();
-      return res.status(404).json({ success: false, message: 'Doctor not found.' });
-    }
-
-    // Check availability
+    // Check doctor availability for that date/time
     const availability = await Availability.findOne({
-      doctorId,
-      date,
-      times: time,
-    }).session(session);
+      doctor: doctorId,
+      date: selectedDate,
+      startTime: { $lte: time },
+      endTime: { $gt: time }
+    });
+    if (!availability) return res.status(400).json({ message: 'Doctor not available at selected time' });
 
-    if (!availability) {
-      await session.abortTransaction();
-      return res.status(400).json({ success: false, message: 'Selected time is not available.' });
-    }
-
-    // Prevent double-booking
+    // Check for existing appointment conflicts for patient and doctor
     const conflict = await Appointment.findOne({
-      doctorId,
-      date,
-      time,
-    }).session(session);
-
-    if (conflict) {
-      await session.abortTransaction();
-      return res.status(409).json({ success: false, message: 'This time slot is already booked.' });
-    }
-
-    // Book the appointment
-    const newAppointment = new Appointment({
-      patientId: userId,
-      doctorId,
-      date,
-      time,
+      $or: [
+        { doctor: doctorId, date: selectedDate, time, status: 'scheduled' },
+        { patient: req.user._id, date: selectedDate, time, status: 'scheduled' }
+      ]
     });
+    if (conflict) return res.status(400).json({ message: 'Time slot already booked' });
 
-    await newAppointment.save({ session });
-
-    // Commit transaction
-    await session.commitTransaction();
-    session.endSession();
-
-    // Notify patient via email
-    const patient = await User.findById(userId);
-    await sendNotification(patient.email, {
-      doctorName: doctor.name,
-      date,
+    const appointment = new Appointment({
+      patient: req.user._id,
+      doctor: doctorId,
+      date: selectedDate,
       time,
+      reason
     });
+    await appointment.save();
 
-    return res.status(201).json({ success: true, message: 'Appointment booked successfully.' });
-  } catch (error) {
-    console.error('Appointment booking error:', error);
-    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+    // Trigger notification scheduling
+    notificationService.scheduleReminder(appointment);
+
+    res.json({ message: 'Appointment booked successfully', appointment });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 
-// @route   GET /api/appointments
-// @desc    Get all appointments for logged-in user
-// @access  Private
-router.get('/', authMiddleware, async (req, res) => {
-  try {
-    const appointments = await Appointment.find({ patientId: req.user.id })
-      .populate('doctorId', 'name specialization email')
-      .sort({ date: 1, time: 1 });
+// Modify appointment - UC2
+router.put('/:id', auth, role(['patient']), async (req, res) => {
+  const appointmentId = req.params.id;
+  const { date, time, reason } = req.body;
 
-    return res.json({ success: true, data: appointments });
-  } catch (error) {
-    console.error('Fetching appointments failed:', error);
-    return res.status(500).json({ success: false, message: 'Unable to fetch appointments.' });
+  try {
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+    if (!appointment.patient.equals(req.user._id)) return res.status(403).json({ message: 'Not authorized' });
+
+    const selectedDate = new Date(date);
+    if (selectedDate < new Date()) return res.status(400).json({ message: 'Date must be in the future' });
+
+    // Check doctor availability for that date/time
+    const availability = await Availability.findOne({
+      doctor: appointment.doctor,
+      date: selectedDate,
+      startTime: { $lte: time },
+      endTime: { $gt: time }
+    });
+    if (!availability) return res.status(400).json({ message: 'Doctor not available at selected time' });
+
+    // Check for conflicts excluding this appointment
+    const conflict = await Appointment.findOne({
+      _id: { $ne: appointmentId },
+      $or: [
+        { doctor: appointment.doctor, date: selectedDate, time, status: 'scheduled' },
+        { patient: req.user._id, date: selectedDate, time, status: 'scheduled' }
+      ]
+    });
+    if (conflict) return res.status(400).json({ message: 'Time slot already booked' });
+
+    appointment.date = selectedDate;
+    appointment.time = time;
+    appointment.reason = reason;
+    await appointment.save();
+
+    notificationService.scheduleReminder(appointment);
+
+    res.json({ message: 'Appointment updated', appointment });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Cancel appointment - UC3
+router.delete('/:id', auth, role(['patient']), async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+    if (!appointment.patient.equals(req.user._id)) return res.status(403).json({ message: 'Not authorized' });
+
+    appointment.status = 'cancelled';
+    await appointment.save();
+
+    res.json({ message: 'Appointment cancelled' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get upcoming appointments for patient
+router.get('/upcoming', auth, role(['patient']), async (req, res) => {
+  try {
+    const now = new Date();
+    const appointments = await Appointment.find({
+      patient: req.user._id,
+      date: { $gte: now },
+      status: 'scheduled'
+    }).populate('doctor', 'name email');
+
+    res.json(appointments);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get appointment history for patient (past + canceled)
+router.get('/history', auth, role(['patient']), async (req, res) => {
+  try {
+    const now = new Date();
+    const appointments = await Appointment.find({
+      patient: req.user._id,
+      date: { $lt: now },
+      status: { $in: ['completed', 'cancelled'] }
+    }).populate('doctor', 'name email');
+
+    res.json(appointments);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 
