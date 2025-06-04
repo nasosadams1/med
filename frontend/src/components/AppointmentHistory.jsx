@@ -1,63 +1,57 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 
-function AppointmentHistory({ token }) {
+export default function AppointmentHistory() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchAppointments = async () => {
+    async function fetchAppointments() {
+      setLoading(true);
+      setError(null);
+
       try {
-        const res = await axios.get('http://localhost:5000/api/appointments', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setAppointments(res.data);
+        const res = await fetch('/api/appointments');
+        if (!res.ok) throw new Error('Failed to fetch appointments');
+
+        const data = await res.json();
+        setAppointments(data);
       } catch (err) {
-        setError(
-          err.response?.data?.message ||
-          'Unable to fetch appointments. Please try again.'
-        );
+        setError(err.message);
       } finally {
         setLoading(false);
       }
-    };
+    }
 
     fetchAppointments();
-  }, [token]);
+  }, []);
+
+  if (loading) return <div className="text-center">Loading appointments...</div>;
+  if (error) return <div className="text-center text-red-600">Error: {error}</div>;
+
+  if (appointments.length === 0)
+    return <div className="text-center text-gray-600">No appointments found.</div>;
 
   return (
-    <div className="mt-8 bg-white p-6 rounded shadow max-w-2xl mx-auto">
+    <div className="max-w-xl mx-auto bg-white p-6 rounded shadow">
       <h2 className="text-xl font-semibold mb-4">Appointment History</h2>
-
-      {loading && <p className="text-gray-600">Loading appointments...</p>}
-
-      {error && (
-        <div className="text-red-600 bg-red-100 border border-red-300 p-3 rounded mb-4">
-          {error}
-        </div>
-      )}
-
-      {!loading && !error && appointments.length === 0 && (
-        <p className="text-gray-500">No past appointments found.</p>
-      )}
-
-      {!loading && appointments.length > 0 && (
-        <ul className="divide-y divide-gray-200">
-          {appointments.map((apt) => (
-            <li key={apt.id} className="py-3">
-              <div className="text-sm font-medium text-gray-800">
-                Dr. {apt.doctor}
-              </div>
-              <div className="text-sm text-gray-600">
-                {apt.date} at {apt.time}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul>
+        {appointments.map(({ id, name, email, date, time }) => (
+          <li
+            key={id}
+            className="border-b last:border-b-0 py-2 flex justify-between items-center"
+          >
+            <div>
+              <p className="font-semibold">{name}</p>
+              <p className="text-sm text-gray-600">{email}</p>
+            </div>
+            <div className="text-right text-sm text-gray-700">
+              <p>{date}</p>
+              <p>{time}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
-
-export default AppointmentHistory;
