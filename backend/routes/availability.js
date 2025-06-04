@@ -1,37 +1,36 @@
 const express = require('express');
 const Availability = require('../models/Availability');
-const Appointment = require('../models/Appointment');
-const authMiddleware = require('../middleware/auth');
-const roleMiddleware = require('../middleware/role');
+const auth = require('../middleware/auth');
+const role = require('../middleware/role');
+
 const router = express.Router();
 
-router.use(authMiddleware);
-
-router.post('/', roleMiddleware(['doctor', 'secretary']), async (req, res) => {
-  const { start, end } = req.body;
-
-  // Check if availability collides with existing appointments
-  const conflict = await Appointment.findOne({
-    doctorId: req.user.id,
-    slot: { $gte: new Date(start), $lt: new Date(end) }
-  });
-  if (conflict) return res.status(400).json({ message: 'Conflicts with booked appointment' });
-
-  const availability = new Availability({
-    doctorId: req.user.id,
-    start,
-    end
-  });
-  await availability.save();
-
-  res.json({ message: 'Availability added' });
+// Doctor adds availability - UC7
+router.post('/', auth, role(['doctor']), async (req, res) => {
+  const { date, startTime, endTime, type } = req.body;
+  try {
+    const availability = new Availability({
+      doctor: req.user._id,
+      date: new Date(date),
+      startTime,
+      endTime,
+      type,
+    });
+    await availability.save();
+    res.json({ message: 'Availability added', availability });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
-router.get('/', roleMiddleware(['doctor', 'secretary']), async (req, res) => {
-  const availabilities = await Availability.find({ doctorId: req.user.id });
-  res.json(availabilities);
+// Doctor views own availability
+router.get('/', auth, role(['doctor']), async (req, res) => {
+  try {
+    const availabilities = await Availability.find({ doctor: req.user._id });
+    res.json(availabilities);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
-
-// Optional: Add route to delete or update availability
 
 module.exports = router;
