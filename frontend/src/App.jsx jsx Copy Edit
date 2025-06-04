@@ -1,0 +1,82 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import BookAppointment from './components/BookAppointment';
+import AppointmentHistory from './components/AppointmentHistory';
+
+const api = axios.create({ baseURL: 'http://localhost:5000/api' });
+
+function App() {
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
+
+  const login = async (email, password) => {
+    const res = await api.post('/auth/login', { email, password });
+    setToken(res.data.token);
+    setUser(res.data.user);
+    localStorage.setItem('token', res.data.token);
+    localStorage.setItem('user', JSON.stringify(res.data.user));
+  };
+
+  const logout = () => {
+    setToken('');
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  };
+
+  if (!token) {
+    return (
+      <LoginForm onLogin={login} />
+    );
+  }
+
+  return (
+    <div className="p-4 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Medical Appointment System</h1>
+      <button onClick={logout} className="mb-4 underline">Logout</button>
+      <BookAppointment token={token} />
+      <AppointmentHistory token={token} />
+    </div>
+  );
+}
+
+function LoginForm({ onLogin }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    try {
+      await onLogin(email, password);
+    } catch {
+      setError('Invalid credentials');
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="max-w-md mx-auto mt-10 p-6 border rounded">
+      <h2 className="text-xl mb-4">Login</h2>
+      {error && <div className="text-red-600 mb-2">{error}</div>}
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        required
+        className="mb-2 p-2 border w-full"
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+        required
+        className="mb-4 p-2 border w-full"
+      />
+      <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Login</button>
+    </form>
+  );
+}
+
+export default App;
