@@ -1,40 +1,30 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-const AppointmentHistory = lazy(() => import('./components/AppointmentHistory'));
-const BookAppointment = lazy(() => import('./components/BookAppointment'));
+const API_URL = import.meta.env.VITE_API_URL || '';
 
-export default function App() {
-  // simple tab state to switch between book and history
-  const [view, setView] = useState('book');
+export default function AppointmentHistory() {
+  // ...same code...
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <header className="mb-4">
-        <nav className="flex gap-4">
-          <button
-            className={`px-4 py-2 rounded ${
-              view === 'book' ? 'bg-blue-600 text-white' : 'bg-white border'
-            }`}
-            onClick={() => setView('book')}
-          >
-            Book Appointment
-          </button>
-          <button
-            className={`px-4 py-2 rounded ${
-              view === 'history' ? 'bg-blue-600 text-white' : 'bg-white border'
-            }`}
-            onClick={() => setView('history')}
-          >
-            Appointment History
-          </button>
-        </nav>
-      </header>
+  useEffect(() => {
+    async function fetchAppointments() {
+      setLoading(true);
+      setError(null);
 
-      <main>
-        <Suspense fallback={<div>Loading...</div>}>
-          {view === 'book' ? <BookAppointment /> : <AppointmentHistory />}
-        </Suspense>
-      </main>
-    </div>
-  );
+      try {
+        const res = await fetch(`${API_URL}/api/appointments`);
+        if (!res.ok) throw new Error('Failed to fetch appointments');
+
+        const data = await res.json();
+        setAppointments(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchAppointments();
+  }, []);
+
+  // ...rest unchanged
 }
